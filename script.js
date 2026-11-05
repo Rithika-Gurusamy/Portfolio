@@ -1,123 +1,151 @@
 /* ═══════════════════════════════════════════════════════════════
    script.js — Portfolio UI Shell
    Sections:
-     1. Constants & helpers
-     2. initParticles()   — canvas floating glass particles
-     3. initWave()        — SVG live trading wave
-     4. init()            — bootstrap everything
+     1. Constants & 4-color palette configuration
+     2. initParticles() — interactive round glass particles
+     3. initWave()      — clean static trading line (big ridges)
+     4. init()          — bootstrap
    ═══════════════════════════════════════════════════════════════ */
 
 'use strict';
 
 /* ═══════════════════════════════════════════════════════════════
-   1.  CONSTANTS & HELPERS
+   1.  CONSTANTS & COLOR PALETTES
    ═══════════════════════════════════════════════════════════════ */
 
-/** Color palette — mirrors CSS variables. */
 const COLOR = {
-  cream: '#FAF8F5',
+  cream: '#FEFFED',
   blue : '#20309A',
   red  : '#BB232B',
 };
 
 /**
- * Particle visual config — Glass Effect.
- * ─ blueRatio    : fraction that are blue (rest are ruby red)
- * ─ minLength    : capsule half-length in px (at 1× DPR)
- * ─ maxLength    : capsule half-length max
- * ─ thickness    : capsule half-thickness
+ * 4-Color Palettes for Round Glass Particles:
+ *   1. Olive / Moss Green
+ *   2. Deep Espresso / Dark Chocolate Brown
+ *   3. Charcoal / Slate Grey
+ *   4. Burnt Ochre / Mustard Yellow
+ */
+const PARTICLE_PALETTES = [
+  // 1. Olive / Moss Green
+  {
+    name     : 'olive',
+    highlight: 'rgba(152, 180, 100, 0.55)',
+    mid      : 'rgba(92, 114, 52, 0.72)',
+    deep     : 'rgba(58, 76, 30, 0.88)',
+    rimLight : 'rgba(180, 210, 125, 0.85)',
+    rimDark  : 'rgba(58, 76, 30, 0.50)',
+    shadow   : 'rgba(58, 76, 30, 0.22)',
+  },
+  // 2. Deep Espresso / Dark Chocolate Brown
+  {
+    name     : 'espresso',
+    highlight: 'rgba(115, 75, 54, 0.50)',
+    mid      : 'rgba(58, 34, 22, 0.78)',
+    deep     : 'rgba(36, 19, 11, 0.92)',
+    rimLight : 'rgba(150, 105, 80, 0.75)',
+    rimDark  : 'rgba(36, 19, 11, 0.55)',
+    shadow   : 'rgba(36, 19, 11, 0.25)',
+  },
+  // 3. Charcoal / Slate Grey
+  {
+    name     : 'charcoal',
+    highlight: 'rgba(120, 134, 145, 0.50)',
+    mid      : 'rgba(54, 63, 72, 0.74)',
+    deep     : 'rgba(34, 40, 46, 0.90)',
+    rimLight : 'rgba(155, 170, 182, 0.80)',
+    rimDark  : 'rgba(34, 40, 46, 0.52)',
+    shadow   : 'rgba(34, 40, 46, 0.22)',
+  },
+  // 4. Burnt Ochre / Mustard Yellow
+  {
+    name     : 'mustard',
+    highlight: 'rgba(238, 190, 80, 0.58)',
+    mid      : 'rgba(206, 122, 34, 0.76)',
+    deep     : 'rgba(168, 90, 18, 0.90)',
+    rimLight : 'rgba(250, 210, 115, 0.85)',
+    rimDark  : 'rgba(168, 90, 18, 0.52)',
+    shadow   : 'rgba(168, 90, 18, 0.22)',
+  },
+];
+
+/**
+ * Particle visual & physics config.
  */
 const PARTICLE_CFG = {
-  blueRatio    : 0.65,
-  minLength    : 3.8,      // half-length (7.6px min total length)
-  maxLength    : 7.2,      // half-length (14.4px max total length)
-  thickness    : 2.2,      // half-thickness (4.4px wide for glass body)
-  alpha        : 0.95,
+  minRadius    : 2.8,      // px
+  maxRadius    : 6.2,      // px
   speed        : 0.45,     // idle drift speed (px/frame at 60fps)
   waveFreq     : 0.012,    // sine wave frequency for organic drift
-  waveAmp      : 0.6,      // amplitude of sine offset on idle velocity
+  waveAmp      : 0.6,      // amplitude of sine offset
   mouseRadius  : 175,      // px — push radius around cursor
   pushStrength : 6.8,      // force multiplier at centre of push radius
-  damping      : 0.88,     // velocity damping per frame (< 1 = friction)
-  returnK      : 0.045,    // spring constant pulling back to home position
-  targetDensity: 1 / 2400, // particles per px² of screen area
+  damping      : 0.88,     // velocity damping (< 1 = smooth friction)
+  returnK      : 0.045,    // spring constant pulling back to home
+  targetDensity: 1 / 2300, // particles per px² of viewport
   minCount     : 280,
-  maxCount     : 600,
+  maxCount     : 620,
 };
 
-/** Wave visual / animation config. */
-const WAVE_CFG = {
-  scrollSpeed  : 0.6,     // px/frame the history scrolls left
-  newPointRate : 2,       // frames between new point generation
-  historyLen   : 220,     // how many points to keep in the rolling window
-  drawInFrames : 90,      // frames for the initial draw-in (stroke-dashoffset)
-  baseY        : 0.52,    // vertical centre of the wave (0=top, 1=bottom of SVG)
-  trendSlope   : -0.0012, // how steeply the trend rises per point (negative = up in SVG)
-  noiseMag     : 0.09,    // random noise magnitude relative to SVG height
-  jaggedness   : 0.65,    // how sharp the jagged peaks are
-  smoothPasses : 1,       // smoothing passes on new points
-};
+/**
+ * Static trading line normalized points (0.0 to 1.0).
+ * Big, bold, clean price ridges with an overall upward trend.
+ * Exactly 11 points creating bold peaks and valleys.
+ */
+const TRADE_POINTS = [
+  { x: 0.00, y: 0.75 }, // starting baseline
+  { x: 0.09, y: 0.64 }, // initial climb
+  { x: 0.18, y: 0.78 }, // big dip / pullback
+  { x: 0.29, y: 0.44 }, // big upward surge
+  { x: 0.40, y: 0.58 }, // healthy correction dip
+  { x: 0.52, y: 0.32 }, // big breakout peak
+  { x: 0.64, y: 0.47 }, // consolidation dip
+  { x: 0.75, y: 0.24 }, // major rally peak
+  { x: 0.85, y: 0.35 }, // retest dip
+  { x: 0.94, y: 0.16 }, // aggressive high
+  { x: 1.00, y: 0.10 }, // latest all-time high point
+];
 
-/** True if the user prefers reduced motion. */
+/** True if the user prefers reduced motion */
 const REDUCED_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-/** Linear interpolation */
-const lerp = (a, b, t) => a + (b - a) * t;
-
-/** Clamp a value between lo and hi */
+/** Helpers */
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-
-/** Returns a random float in [min, max) */
-const rnd = (min, max) => Math.random() * (max - min) + min;
+const rnd   = (min, max) => Math.random() * (max - min) + min;
 
 
 /* ═══════════════════════════════════════════════════════════════
-   2.  FLOATING GLASS PARTICLES
+   2.  ROUND GLASS PARTICLES
    ═══════════════════════════════════════════════════════════════ */
 
 function initParticles() {
 
-  // ── Canvas setup ──────────────────────────────────────────────
   const canvas = document.getElementById('particle-canvas');
   const ctx    = canvas.getContext('2d');
   let   dpr    = window.devicePixelRatio || 1;
 
-  /** Physical (CSS) dimensions */
   let W = 0, H = 0;
-
-  /** Current mouse / touch position in CSS px (or null when off-screen) */
   let mouse = null;
-
-  // ── Particle state ────────────────────────────────────────────
   let particles = [];
 
   /**
-   * One particle:
-   *   hx, hy      — home (resting) position in CSS px
-   *   x,  y       — current position
-   *   vx, vy      — velocity
-   *   phase       — phase offset for the sine-drift
-   *   isBlue      — true if sapphire blue glass, false if ruby red glass
-   *   len         — half-length of the capsule shape
-   *   angle       — current draw angle (follows velocity)
+   * Creates one round particle with one of the 4 designated colors.
    */
   function makeParticle(x, y) {
-    const isBlue = Math.random() < PARTICLE_CFG.blueRatio;
+    const palIndex = Math.floor(Math.random() * PARTICLE_PALETTES.length);
     return {
-      hx    : x,
-      hy    : y,
-      x     : x,
-      y     : y,
-      vx    : rnd(-0.4, 0.4),
-      vy    : rnd(-0.4, 0.4),
-      phase : rnd(0, Math.PI * 2),
-      isBlue: isBlue,
-      len   : rnd(PARTICLE_CFG.minLength, PARTICLE_CFG.maxLength),
-      angle : rnd(0, Math.PI * 2),
+      hx      : x,
+      hy      : y,
+      x       : x,
+      y       : y,
+      vx      : rnd(-0.4, 0.4),
+      vy      : rnd(-0.4, 0.4),
+      phase   : rnd(0, Math.PI * 2),
+      radius  : rnd(PARTICLE_CFG.minRadius, PARTICLE_CFG.maxRadius),
+      palette : PARTICLE_PALETTES[palIndex],
     };
   }
 
-  /** Rebuild the particle array for the current viewport size */
   function buildParticles() {
     const area  = W * H;
     const count = clamp(
@@ -143,7 +171,6 @@ function initParticles() {
     }
   }
 
-  /** Resize the canvas to fill the viewport at the device's pixel ratio */
   function resizeCanvas() {
     dpr = window.devicePixelRatio || 1;
     W   = window.innerWidth;
@@ -155,11 +182,9 @@ function initParticles() {
     canvas.style.height = H + 'px';
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
     buildParticles();
   }
 
-  // ── Animation loop ────────────────────────────────────────────
   let frameCount = 0;
   let rafId      = null;
 
@@ -167,33 +192,32 @@ function initParticles() {
     ctx.clearRect(0, 0, W, H);
 
     frameCount++;
-    const t = frameCount * 0.016; // approx time in seconds
+    const t = frameCount * 0.016;
 
     for (let i = 0; i < particles.length; i++) {
       const p = particles[i];
 
       if (REDUCED_MOTION) {
-        // No motion — draw static at home position
-        drawGlassCapsule(ctx, p.hx, p.hy, p.angle, p.len, p.isBlue);
+        drawRoundGlass(ctx, p.hx, p.hy, p.radius, p.palette);
         continue;
       }
 
-      // ── Idle sine drift ──────────────────────────────────────
+      // Idle natural drift
       const driftAngle = p.phase + t * PARTICLE_CFG.speed;
       const idleVx = Math.cos(driftAngle) * PARTICLE_CFG.waveAmp * PARTICLE_CFG.speed;
       const idleVy = Math.sin(driftAngle * PARTICLE_CFG.waveFreq * 60) * PARTICLE_CFG.waveAmp * PARTICLE_CFG.speed;
 
-      // ── Spring toward home ───────────────────────────────────
+      // Spring toward home anchor
       const springVx = (p.hx - p.x) * PARTICLE_CFG.returnK;
       const springVy = (p.hy - p.y) * PARTICLE_CFG.returnK;
 
-      // ── Mouse repulsion ──────────────────────────────────────
+      // Mouse / touch repulsion
       let pushVx = 0, pushVy = 0;
       if (mouse) {
-        const dx  = p.x - mouse.x;
-        const dy  = p.y - mouse.y;
-        const d2  = dx * dx + dy * dy;
-        const r   = PARTICLE_CFG.mouseRadius;
+        const dx = p.x - mouse.x;
+        const dy = p.y - mouse.y;
+        const d2 = dx * dx + dy * dy;
+        const r  = PARTICLE_CFG.mouseRadius;
         if (d2 < r * r && d2 > 0.001) {
           const d      = Math.sqrt(d2);
           const factor = (1 - d / r);
@@ -203,99 +227,71 @@ function initParticles() {
         }
       }
 
-      // ── Integrate velocity ───────────────────────────────────
+      // Physics integration
       p.vx = (p.vx + idleVx + springVx + pushVx) * PARTICLE_CFG.damping;
       p.vy = (p.vy + idleVy + springVy + pushVy) * PARTICLE_CFG.damping;
 
       p.x += p.vx;
       p.y += p.vy;
 
-      // ── Orient capsule along velocity ────────────────────────
-      const speed = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
-      if (speed > 0.05) {
-        p.angle = Math.atan2(p.vy, p.vx);
-      }
-
-      drawGlassCapsule(ctx, p.x, p.y, p.angle, p.len, p.isBlue);
+      drawRoundGlass(ctx, p.x, p.y, p.radius, p.palette);
     }
 
     rafId = requestAnimationFrame(tickParticles);
   }
 
   /**
-   * Draw a rotated frosted glass capsule at (cx, cy):
-   * 1. Soft tinted caustic drop shadow on the cream canvas.
-   * 2. Translucent refraction gradient body (crystalline tinted core).
-   * 3. Polished specular rim / beveled highlight.
-   * 4. Specular gleam line across the upper glass face.
+   * Draw a spherical frosted glass disc / bead:
+   * 1. Soft depth shadow casting on #FEFFED.
+   * 2. 3D radial glass gradient with top-left specular highlight.
+   * 3. Polished bevel rim stroke catching directional light.
+   * 4. Crisp specular glint dot in the upper-left facet.
    */
-  function drawGlassCapsule(ctx, cx, cy, angle, len, isBlue) {
+  function drawRoundGlass(ctx, cx, cy, r, pal) {
     ctx.save();
     ctx.translate(cx, cy);
-    ctx.rotate(angle);
 
-    const r = PARTICLE_CFG.thickness;
-    const l = len;
+    // 1. Ambient depth shadow
+    ctx.shadowColor   = pal.shadow;
+    ctx.shadowBlur    = 4.5;
+    ctx.shadowOffsetY = 1.3;
 
-    // ── 1. Soft depth shadow on the cream surface ───────────────
-    ctx.shadowColor = isBlue ? 'rgba(32, 48, 154, 0.18)' : 'rgba(187, 35, 43, 0.18)';
-    ctx.shadowBlur = 4;
-    ctx.shadowOffsetY = 1.2;
-
-    // ── 2. Construct capsule path ───────────────────────────────
+    // 2. Circular body path & radial glass refraction
     ctx.beginPath();
-    ctx.moveTo(-l + r, -r);
-    ctx.lineTo( l - r, -r);
-    ctx.arc(   l - r,  0,  r,  -Math.PI / 2, Math.PI / 2);
-    ctx.lineTo(-l + r,  r);
-    ctx.arc(  -l + r,  0,  r,   Math.PI / 2, (3 * Math.PI) / 2);
-    ctx.closePath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
 
-    // ── 3. Translucent tinted frosted glass gradient ────────────
-    const bodyGrad = ctx.createLinearGradient(0, -r, 0, r);
-    if (isBlue) {
-      bodyGrad.addColorStop(0,    'rgba(255, 255, 255, 0.85)'); // top specular sheen
-      bodyGrad.addColorStop(0.25, 'rgba(64, 88, 205, 0.42)');   // light translucent blue
-      bodyGrad.addColorStop(0.75, 'rgba(32, 48, 154, 0.68)');   // crystal blue body
-      bodyGrad.addColorStop(1,    'rgba(32, 48, 154, 0.35)');   // bottom refraction
-    } else {
-      bodyGrad.addColorStop(0,    'rgba(255, 255, 255, 0.85)'); // top specular sheen
-      bodyGrad.addColorStop(0.25, 'rgba(220, 68, 76, 0.42)');   // light translucent ruby
-      bodyGrad.addColorStop(0.75, 'rgba(187, 35, 43, 0.68)');   // crystal red body
-      bodyGrad.addColorStop(1,    'rgba(187, 35, 43, 0.35)');   // bottom refraction
-    }
-
-    ctx.fillStyle = bodyGrad;
+    const grad = ctx.createRadialGradient(-r * 0.35, -r * 0.35, r * 0.08, 0, 0, r);
+    grad.addColorStop(0,    'rgba(255, 255, 255, 0.92)'); // top-left light catch
+    grad.addColorStop(0.24, pal.highlight);               // translucent glass core
+    grad.addColorStop(0.76, pal.mid);                     // rich jewel tone
+    grad.addColorStop(1,    pal.deep);                    // deeper underbelly
+    ctx.fillStyle = grad;
     ctx.fill();
 
-    // ── 4. Polished glass bevel rim (crisp specular edge) ───────
+    // 3. Polished bevel rim edge
     ctx.shadowColor = 'transparent';
-    ctx.shadowBlur = 0;
-    ctx.lineWidth = 0.85;
+    ctx.shadowBlur  = 0;
+    ctx.lineWidth   = 0.85;
 
-    const rimGrad = ctx.createLinearGradient(-l, -r, l, r);
-    rimGrad.addColorStop(0,    'rgba(255, 255, 255, 0.95)'); // sharp light catch
-    rimGrad.addColorStop(0.4,  isBlue ? 'rgba(90, 120, 240, 0.55)' : 'rgba(235, 80, 90, 0.55)');
-    rimGrad.addColorStop(0.8,  'rgba(255, 255, 255, 0.75)');
-    rimGrad.addColorStop(1,    isBlue ? 'rgba(32, 48, 154, 0.4)' : 'rgba(187, 35, 43, 0.4)');
-
+    const rimGrad = ctx.createLinearGradient(-r, -r, r, r);
+    rimGrad.addColorStop(0,   'rgba(255, 255, 255, 0.95)');
+    rimGrad.addColorStop(0.4, pal.rimLight);
+    rimGrad.addColorStop(1,   pal.rimDark);
     ctx.strokeStyle = rimGrad;
     ctx.stroke();
 
-    // ── 5. Specular highlight streak (light reflection line) ────
-    if (l > r * 1.4) {
+    // 4. Specular glint reflection
+    if (r > 3.0) {
       ctx.beginPath();
-      ctx.moveTo(-l * 0.55, -r * 0.42);
-      ctx.lineTo( l * 0.45, -r * 0.42);
-      ctx.lineWidth = 0.65;
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
-      ctx.stroke();
+      ctx.arc(-r * 0.35, -r * 0.35, Math.max(0.6, r * 0.2), 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.88)';
+      ctx.fill();
     }
 
     ctx.restore();
   }
 
-  // ── Pointer tracking ──────────────────────────────────────────
+  // Pointer interaction (mouse + touch)
   function onPointerMove(e) {
     const rect = canvas.getBoundingClientRect();
     mouse = {
@@ -313,7 +309,7 @@ function initParticles() {
   window.addEventListener('touchmove',    onPointerMove,  { passive: true });
   window.addEventListener('touchend',     onPointerLeave, { passive: true });
 
-  // ── Visibility — pause animation when tab is hidden ──────────
+  // Pause when tab is not visible
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
       cancelAnimationFrame(rafId);
@@ -323,21 +319,20 @@ function initParticles() {
     }
   });
 
-  // ── Resize ───────────────────────────────────────────────────
+  // Responsive resize
   let resizeTimer;
   window.addEventListener('resize', () => {
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(resizeCanvas, 150);
   });
 
-  // ── Kick off ─────────────────────────────────────────────────
   resizeCanvas();
   rafId = requestAnimationFrame(tickParticles);
 }
 
 
 /* ═══════════════════════════════════════════════════════════════
-   3.  TRADING WAVE
+   3.  STATIC TRADING WAVE (BIG CLEAN RIDGES)
    ═══════════════════════════════════════════════════════════════ */
 
 function initWave() {
@@ -347,161 +342,57 @@ function initWave() {
   const fillEl = document.getElementById('wave-fill');
   const dotEl  = document.getElementById('wave-dot');
 
-  if (!svg || !pathEl) return;
-
-  /** yHistory[i] = normalised Y value (0 = top, 1 = bottom) */
-  let yHistory = [];
-
-  /** Accumulated horizontal scroll offset (sub-pixel) */
-  let scrollOffset = 0;
-
-  /** Current pseudo-random Y */
-  let currentY = WAVE_CFG.baseY;
-
-  /** Frame index for new-point rate throttling */
-  let waveFrame = 0;
-
-  /** Stroke length for the draw-in animation */
-  let totalLength = 0;
-
-  /** Draw-in progress: 0 = nothing drawn, 1 = fully drawn */
-  let drawInProgress = REDUCED_MOTION ? 1 : 0;
-
-  // ── Seed initial history ──────────────────────────────────────
-  function seedHistory(numPoints) {
-    yHistory = [];
-    currentY = WAVE_CFG.baseY;
-    for (let i = 0; i < numPoints; i++) {
-      currentY = nextY(currentY, i);
-      yHistory.push(currentY);
-    }
-  }
+  if (!svg || !pathEl || !fillEl || !dotEl) return;
 
   /**
-   * Generate next Y value preserving an upward trend with jagged price noise.
+   * Renders the static trading path and fill based on TRADE_POINTS.
+   * Completely static — NO animation loop, NO ticker scrolling, NO draw-in.
    */
-  function nextY(prev, idx) {
-    const trendTarget = 0.28;
-    const trendPull   = (trendTarget - prev) * 0.018;
-    const noise       = (Math.random() - 0.42) * WAVE_CFG.noiseMag * 2;
-    const spike       = Math.random() < 0.12
-      ? (Math.random() - 0.5) * WAVE_CFG.noiseMag * 3.5
-      : 0;
-
-    let next = prev + trendPull + noise + spike;
-    return clamp(next, 0.10, 0.85);
-  }
-
-  function pointCoord(svgW, svgH, i) {
-    const numPts = yHistory.length;
-    const x = (i / (numPts - 1)) * svgW - scrollOffset;
-    const y = yHistory[i] * svgH;
-    return { x, y };
-  }
-
-  function rebuildPath() {
+  function renderStaticWave() {
     const rect = svg.getBoundingClientRect();
     const svgW = rect.width  || svg.clientWidth  || 600;
-    const svgH = rect.height || svg.clientHeight || 160;
+    const svgH = rect.height || svg.clientHeight || 140;
 
-    if (yHistory.length < 2) return;
+    let pathD = '';
+    const coords = TRADE_POINTS.map(pt => ({
+      x: pt.x * svgW,
+      y: pt.y * svgH,
+    }));
 
-    let d = '';
-    for (let i = 0; i < yHistory.length; i++) {
-      const { x, y } = pointCoord(svgW, svgH, i);
-      d += i === 0 ? `M ${x.toFixed(2)},${y.toFixed(2)} ` : `L ${x.toFixed(2)},${y.toFixed(2)} `;
-    }
+    // Build the clean jagged stroke path with big ridges
+    coords.forEach((c, i) => {
+      pathD += i === 0
+        ? `M ${c.x.toFixed(2)},${c.y.toFixed(2)} `
+        : `L ${c.x.toFixed(2)},${c.y.toFixed(2)} `;
+    });
 
-    pathEl.setAttribute('d', d);
+    pathEl.setAttribute('d', pathD);
 
-    // Fill path: close below the line
-    const last  = pointCoord(svgW, svgH, yHistory.length - 1);
-    const first = pointCoord(svgW, svgH, 0);
-    const fillD = d + ` L ${last.x.toFixed(2)},${svgH} L ${first.x.toFixed(2)},${svgH} Z`;
+    // Build the soft gradient fill beneath the line
+    const first = coords[0];
+    const last  = coords[coords.length - 1];
+    const fillD = `${pathD} L ${last.x.toFixed(2)},${svgH} L ${first.x.toFixed(2)},${svgH} Z`;
     fillEl.setAttribute('d', fillD);
 
-    // Move the endpoint dot
+    // Place the static latest-point dot with radius 5.5
     dotEl.setAttribute('cx', last.x.toFixed(2));
     dotEl.setAttribute('cy', last.y.toFixed(2));
-
-    // Draw-in via stroke-dashoffset
-    if (drawInProgress < 1) {
-      if (totalLength === 0) {
-        try { totalLength = pathEl.getTotalLength(); } catch(e) {}
-        pathEl.style.strokeDasharray  = totalLength;
-        pathEl.style.strokeDashoffset = totalLength;
-        fillEl.style.opacity = '0';
-      }
-      const offset = totalLength * (1 - drawInProgress);
-      pathEl.style.strokeDashoffset = offset;
-      fillEl.style.opacity = drawInProgress.toFixed(3);
-    } else {
-      pathEl.style.strokeDasharray  = 'none';
-      pathEl.style.strokeDashoffset = '0';
-      fillEl.style.opacity = '1';
-    }
+    dotEl.setAttribute('r',  '5.5');
   }
 
-  let waveRafId = null;
+  // Render on load and update coordinates on resize for perfect responsiveness
+  renderStaticWave();
 
-  function tickWave() {
-    waveFrame++;
-
-    if (!REDUCED_MOTION) {
-      if (drawInProgress < 1) {
-        drawInProgress = Math.min(1, drawInProgress + 1 / WAVE_CFG.drawInFrames);
-      }
-
-      scrollOffset += WAVE_CFG.scrollSpeed;
-
-      const svgW = svg.clientWidth || 600;
-      const pointSpacing = svgW / (yHistory.length - 1);
-
-      if (scrollOffset >= pointSpacing) {
-        scrollOffset -= pointSpacing;
-        yHistory.shift();
-        const newY = nextY(yHistory[yHistory.length - 1], waveFrame);
-        yHistory.push(newY);
-      }
-    }
-
-    rebuildPath();
-    waveRafId = requestAnimationFrame(tickWave);
-  }
-
-  function resizeWave() {
-    const svgW = svg.clientWidth || 600;
-    const pointSpacing = Math.max(4, svgW / (WAVE_CFG.historyLen - 1));
-    const numPoints    = Math.ceil(svgW / pointSpacing) + 2;
-    seedHistory(clamp(numPoints, 60, WAVE_CFG.historyLen));
-    scrollOffset = 0;
-    totalLength  = 0;
-    if (!REDUCED_MOTION) {
-      drawInProgress = 0;
-    }
-  }
-
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden) {
-      cancelAnimationFrame(waveRafId);
-      waveRafId = null;
-    } else if (!waveRafId) {
-      waveRafId = requestAnimationFrame(tickWave);
-    }
-  });
-
+  let waveResizeTimer;
   window.addEventListener('resize', () => {
-    clearTimeout(window._waveResizeTimer);
-    window._waveResizeTimer = setTimeout(resizeWave, 160);
+    clearTimeout(waveResizeTimer);
+    waveResizeTimer = setTimeout(renderStaticWave, 120);
   });
-
-  resizeWave();
-  waveRafId = requestAnimationFrame(tickWave);
 }
 
 
 /* ═══════════════════════════════════════════════════════════════
-   4.  INIT — bootstrap on DOMContentLoaded
+   4.  INIT
    ═══════════════════════════════════════════════════════════════ */
 
 function init() {

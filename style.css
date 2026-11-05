@@ -11,7 +11,7 @@
 ─────────────────────────────────────────────── */
 :root {
   /* Core palette */
-  --clr-cream:      #FAF8F5;   /* Rich, warm, very light cream paper-white */
+  --clr-cream:      #FEFFED;   /* Requested light cream background         */
   --clr-white:      #FFFFFF;
   --clr-blue:       #20309A;
   --clr-blue-dark:  #182478;   /* slightly deeper blue for hover states    */
@@ -273,21 +273,16 @@ img, svg {
   opacity: 1;
 }
 
-/* The trading line */
+/* The trading line — completely static */
 .hero__wave-path {
-  transition: d 0.016s linear;   /* JS drives coordinates smoothly */
+  stroke-dasharray: none;
+  stroke-dashoffset: 0;
 }
 
-/* Pulsing latest-point dot */
+/* Static endpoint dot with soft red glow */
 .hero__wave-dot {
   fill: var(--clr-red);
   filter: drop-shadow(0 0 6px var(--clr-red-glow));
-  animation: dotPulse 1.4s ease-in-out infinite;
-}
-
-@keyframes dotPulse {
-  0%, 100% { r: 4.5; opacity: 1;   }
-  50%      { r: 7.0; opacity: 0.6; }
 }
 
 /* ───────────────────────────────────────────────
