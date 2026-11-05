@@ -1,77 +1,53 @@
 /* ═══════════════════════════════════════════════════════════════
    script.js — Portfolio UI Shell
    Sections:
-     1. Constants & Blue/Red Color Palettes
-     2. initParticles() — hover-activated round glass particles
+     1. Constants & RGB color definitions
+     2. initParticles() — hover-activated slightly elongated bubbles
+                          with live opposite-color shift on proximity
      3. init()          — bootstrap
    ═══════════════════════════════════════════════════════════════ */
 
 'use strict';
 
 /* ═══════════════════════════════════════════════════════════════
-   1.  CONSTANTS & COLOR PALETTES
+   1.  CONSTANTS & RGB COLORS
    ═══════════════════════════════════════════════════════════════ */
 
-const COLOR = {
-  white: '#FFFFFF',
-  blue : '#20309A',
-  red  : '#BB232B',
-};
+/** Pure vibrant primary colors */
+const COLOR_BLUE_RGB = [32, 48, 154];  // #20309A
+const COLOR_RED_RGB  = [187, 35, 43];  // #BB232B
 
 /**
- * Vibrant Blue & Red Glass Palettes:
- *   1. Electric Sapphire Blue  (#20309A)
- *   2. Vivid Ruby Red          (#BB232B)
- * Highly visible, saturated, and punchy against #FFFFFF.
- */
-const PARTICLE_PALETTES = {
-  blue: {
-    name     : 'blue',
-    highlight: [110, 145, 255],
-    mid      : [32, 48, 154],
-    deep     : [16, 26, 110],
-    rimLight : [150, 185, 255],
-    rimDark  : [20, 32, 130],
-    shadow   : [32, 48, 154],
-  },
-  red: {
-    name     : 'red',
-    highlight: [245, 95, 105],
-    mid      : [187, 35, 43],
-    deep     : [125, 18, 25],
-    rimLight : [255, 140, 150],
-    rimDark  : [130, 20, 28],
-    shadow   : [187, 35, 43],
-  },
-};
-
-/**
- * Particle visual & physics config.
- * Blank canvas by default; wakes up into a vibrant Blue & Red field
- * on mouse hover matching the Google Antigravity hero.
+ * Bubble visual & interaction config.
+ * - Slightly elongated (1.32x aspect ratio) oriented along motion.
+ * - Inverts to the opposite color when hovered.
+ * - Bright, saturated bubble body without milky white washout.
  */
 const PARTICLE_CFG = {
-  blueRatio      : 0.65,  // 65% blue, 35% red
+  blueRatio      : 0.65,  // 65% Blue, 35% Red
   minRadius      : 3.2,   // px
   maxRadius      : 6.8,   // px
+  elongation     : 1.32,  // tiny teeny elongation ratio (rx = r * 1.32, ry = r * 0.92)
   influenceRadius: 290,   // px — wake-up / illumination radius around cursor
-  pushRadius     : 185,   // px — physical repulsion radius
+  pushRadius     : 185,   // px — physical repulsion & color-inversion radius
   pushStrength   : 7.8,   // peak repulsion acceleration
-  damping        : 0.85,  // velocity friction
-  returnK        : 0.045, // elastic spring return to home anchor
-  fadeSpeed      : 0.08,  // alpha interpolation speed
+  damping        : 0.86,  // velocity friction
+  returnK        : 0.045, // spring return constant
+  fadeSpeed      : 0.08,  // alpha transition speed
+  colorShiftSpeed: 0.16,  // color inversion transition speed
   idleTimeoutMs  : 1600,  // fade back to blank when mouse stops moving
-  targetDensity  : 1 / 1800, // grid density across viewport
+  targetDensity  : 1 / 1800,
   minCount       : 320,
   maxCount       : 750,
 };
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-const rnd   = (min, max) => Math.random() * (max - min) + min;
+const lerp  = (a, b, t)   => a + (b - a) * t;
+const rnd   = (min, max)  => Math.random() * (max - min) + min;
 
 
 /* ═══════════════════════════════════════════════════════════════
-   2.  ROUND GLASS PARTICLES (HOVER-ACTIVATED BLUE & RED)
+   2.  BUBBLE PARTICLES (HOVER WAKE & COLOR INVERSION)
    ═══════════════════════════════════════════════════════════════ */
 
 function initParticles() {
@@ -92,22 +68,22 @@ function initParticles() {
   };
 
   /**
-   * One particle starting at alpha = 0 (clean white canvas by default).
+   * Create one bubble with native color and color-shift tracker.
    */
   function makeParticle(x, y) {
-    const isBlue  = Math.random() < PARTICLE_CFG.blueRatio;
-    const palette = isBlue ? PARTICLE_PALETTES.blue : PARTICLE_PALETTES.red;
-
+    const isBlue = Math.random() < PARTICLE_CFG.blueRatio;
     return {
-      hx      : x,
-      hy      : y,
-      x       : x,
-      y       : y,
-      vx      : 0,
-      vy      : 0,
-      radius  : rnd(PARTICLE_CFG.minRadius, PARTICLE_CFG.maxRadius),
-      palette : palette,
-      alpha   : 0, // starts completely invisible
+      hx        : x,
+      hy        : y,
+      x         : x,
+      y         : y,
+      vx        : 0,
+      vy        : 0,
+      angle     : rnd(0, Math.PI * 2),
+      radius    : rnd(PARTICLE_CFG.minRadius, PARTICLE_CFG.maxRadius),
+      isBlue    : isBlue,
+      colorShift: 0, // 0 = native color, 1 = inverted opposite color
+      alpha     : 0, // starts invisible (blank canvas by default)
     };
   }
 
@@ -152,7 +128,6 @@ function initParticles() {
     ctx.clearRect(0, 0, W, H);
 
     const now = performance.now();
-    // Inactive if mouse stopped moving or left window
     const isMouseAlive = mouse.active && (now - mouse.lastMove < PARTICLE_CFG.idleTimeoutMs);
 
     for (let i = 0; i < particles.length; i++) {
@@ -162,9 +137,10 @@ function initParticles() {
       const springVx = (p.hx - p.x) * PARTICLE_CFG.returnK;
       const springVy = (p.hy - p.y) * PARTICLE_CFG.returnK;
 
-      let pushVx = 0;
-      let pushVy = 0;
+      let pushVx      = 0;
+      let pushVy      = 0;
       let targetAlpha = 0;
+      let targetShift = 0;
 
       if (isMouseAlive) {
         const dx = p.x - mouse.x;
@@ -175,24 +151,31 @@ function initParticles() {
         if (d2 < infR * infR) {
           const d = Math.sqrt(d2);
 
-          // Alpha reveals around cursor with a smooth radial falloff
+          // Reveal around cursor with smooth radial falloff
           const normD = d / infR;
           targetAlpha = Math.pow(1 - normD, 1.3);
 
-          // Outward radial repulsion
+          // Proximity to cursor triggers opposite-color shift & repulsion
           const pushR = PARTICLE_CFG.pushRadius;
           if (d < pushR) {
             const factor = (1 - d / pushR);
-            const force  = factor * factor * PARTICLE_CFG.pushStrength;
-            const safeD  = Math.max(d, 0.001);
+            // Invert toward opposite color smoothly
+            targetShift = Math.pow(factor, 0.85);
+
+            // Outward repulsion
+            const force = factor * factor * PARTICLE_CFG.pushStrength;
+            const safeD = Math.max(d, 0.001);
             pushVx = (dx / safeD) * force;
             pushVy = (dy / safeD) * force;
           }
         }
       }
 
-      // Smoothly interpolate alpha (reveals when hovered, dissolves back to blank)
+      // Smooth alpha interpolation (wake up on hover, dissolve to blank)
       p.alpha += (targetAlpha - p.alpha) * PARTICLE_CFG.fadeSpeed;
+
+      // Smooth color shift interpolation (shifts to opposite color on hover)
+      p.colorShift += (targetShift - p.colorShift) * PARTICLE_CFG.colorShiftSpeed;
 
       // Integrate velocity and position
       p.vx = (p.vx + springVx + pushVx) * PARTICLE_CFG.damping;
@@ -201,9 +184,29 @@ function initParticles() {
       p.x += p.vx;
       p.y += p.vy;
 
-      // Draw only if visible (keeps canvas blank otherwise)
+      // Update elongation heading angle along motion
+      const speed = Math.hypot(p.vx, p.vy);
+      if (speed > 0.04) {
+        p.angle = Math.atan2(p.vy, p.vx);
+      }
+
+      // Calculate current interpolated RGB (Blue inverts to Red, Red inverts to Blue)
+      let cr, cg, cb;
+      if (p.isBlue) {
+        // Native: Blue [32, 48, 154] -> Inverted: Red [187, 35, 43]
+        cr = Math.round(lerp(COLOR_BLUE_RGB[0], COLOR_RED_RGB[0], p.colorShift));
+        cg = Math.round(lerp(COLOR_BLUE_RGB[1], COLOR_RED_RGB[1], p.colorShift));
+        cb = Math.round(lerp(COLOR_BLUE_RGB[2], COLOR_RED_RGB[2], p.colorShift));
+      } else {
+        // Native: Red [187, 35, 43] -> Inverted: Blue [32, 48, 154]
+        cr = Math.round(lerp(COLOR_RED_RGB[0], COLOR_BLUE_RGB[0], p.colorShift));
+        cg = Math.round(lerp(COLOR_RED_RGB[1], COLOR_BLUE_RGB[1], p.colorShift));
+        cb = Math.round(lerp(COLOR_RED_RGB[2], COLOR_BLUE_RGB[2], p.colorShift));
+      }
+
+      // Draw bubble if visible
       if (p.alpha > 0.01) {
-        drawRoundGlass(ctx, p.x, p.y, p.radius, p.palette, p.alpha);
+        drawBubble(ctx, p.x, p.y, p.radius, p.angle, cr, cg, cb, p.alpha);
       }
     }
 
@@ -211,54 +214,54 @@ function initParticles() {
   }
 
   /**
-   * Draw a spherical frosted glass bead in vibrant Blue or Red.
+   * Draw a bright, punchy, slightly elongated bubble:
+   * - Tiny teeny elongation along motion angle.
+   * - Rich saturated pigment (no milky white washout).
+   * - Clean crisp bubble rim.
+   * - Tiny specular glint reflection dot.
    */
-  function drawRoundGlass(ctx, cx, cy, r, pal, alpha) {
+  function drawBubble(ctx, cx, cy, r, angle, cr, cg, cb, alpha) {
     ctx.save();
     ctx.translate(cx, cy);
+    ctx.rotate(angle);
 
     const a = clamp(alpha, 0, 1);
+    const rx = r * PARTICLE_CFG.elongation; // slightly elongated
+    const ry = r * 0.92;
 
-    // 1. Soft depth shadow on pure white
-    const sh = pal.shadow;
-    ctx.shadowColor   = `rgba(${sh[0]}, ${sh[1]}, ${sh[2]}, ${(0.28 * a).toFixed(3)})`;
-    ctx.shadowBlur    = 5.0 * a;
-    ctx.shadowOffsetY = 1.4;
+    // 1. Subtle, vibrant tinted aura
+    ctx.shadowColor   = `rgba(${cr}, ${cg}, ${cb}, ${(0.32 * a).toFixed(3)})`;
+    ctx.shadowBlur    = 4.5 * a;
+    ctx.shadowOffsetY = 0.5;
 
-    // 2. Circular body path & 3D radial glass refraction
+    // 2. Slightly elongated bubble geometry
     ctx.beginPath();
-    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
 
-    const grad = ctx.createRadialGradient(-r * 0.35, -r * 0.35, r * 0.08, 0, 0, r);
-    const hl = pal.highlight;
-    const md = pal.mid;
-    const dp = pal.deep;
+    // 3. Bright, punchy, saturated bubble fill (NOT washed out with white)
+    const grad = ctx.createRadialGradient(-rx * 0.25, -ry * 0.25, r * 0.08, 0, 0, rx);
+    const brightR = Math.min(255, Math.round(cr * 1.25 + 24));
+    const brightG = Math.min(255, Math.round(cg * 1.25 + 24));
+    const brightB = Math.min(255, Math.round(cb * 1.25 + 24));
 
-    grad.addColorStop(0,    `rgba(255, 255, 255, ${(0.95 * a).toFixed(3)})`);
-    grad.addColorStop(0.24, `rgba(${hl[0]}, ${hl[1]}, ${hl[2]}, ${(0.65 * a).toFixed(3)})`);
-    grad.addColorStop(0.76, `rgba(${md[0]}, ${md[1]}, ${md[2]}, ${(0.88 * a).toFixed(3)})`);
-    grad.addColorStop(1,    `rgba(${dp[0]}, ${dp[1]}, ${dp[2]}, ${(0.96 * a).toFixed(3)})`);
+    grad.addColorStop(0,   `rgba(${brightR}, ${brightG}, ${brightB}, ${(0.94 * a).toFixed(3)})`);
+    grad.addColorStop(0.55, `rgba(${cr}, ${cg}, ${cb}, ${(0.86 * a).toFixed(3)})`);
+    grad.addColorStop(1,   `rgba(${Math.round(cr * 0.85)}, ${Math.round(cg * 0.85)}, ${Math.round(cb * 0.85)}, ${(0.92 * a).toFixed(3)})`);
+
     ctx.fillStyle = grad;
     ctx.fill();
 
-    // 3. Polished bevel rim edge
+    // 4. Crisp bubble perimeter stroke
     ctx.shadowColor = 'transparent';
     ctx.shadowBlur  = 0;
     ctx.lineWidth   = 0.95;
-
-    const rimGrad = ctx.createLinearGradient(-r, -r, r, r);
-    const rl = pal.rimLight;
-    const rd = pal.rimDark;
-    rimGrad.addColorStop(0,   `rgba(255, 255, 255, ${(0.95 * a).toFixed(3)})`);
-    rimGrad.addColorStop(0.4, `rgba(${rl[0]}, ${rl[1]}, ${rl[2]}, ${(0.85 * a).toFixed(3)})`);
-    rimGrad.addColorStop(1,   `rgba(${rd[0]}, ${rd[1]}, ${rd[2]}, ${(0.60 * a).toFixed(3)})`);
-    ctx.strokeStyle = rimGrad;
+    ctx.strokeStyle = `rgba(${cr}, ${cg}, ${cb}, ${(0.96 * a).toFixed(3)})`;
     ctx.stroke();
 
-    // 4. Specular glint reflection
+    // 5. Crisp specular glint reflection dot
     if (r > 3.0) {
       ctx.beginPath();
-      ctx.arc(-r * 0.35, -r * 0.35, Math.max(0.7, r * 0.22), 0, Math.PI * 2);
+      ctx.arc(-rx * 0.42, -ry * 0.42, Math.max(0.65, r * 0.22), 0, Math.PI * 2);
       ctx.fillStyle = `rgba(255, 255, 255, ${(0.92 * a).toFixed(3)})`;
       ctx.fill();
     }
