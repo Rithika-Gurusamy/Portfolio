@@ -50,42 +50,6 @@
           </a>
         </div>
 
-        <!-- Lower third: live trading wave (SVG drawn by JS) -->
-        <div class="hero__wave-wrap" aria-hidden="true">
-          <svg
-            id="wave-svg"
-            class="hero__wave-svg"
-            xmlns="http://www.w3.org/2000/svg"
-            preserveAspectRatio="none"
-          >
-            <!-- Glow filter -->
-            <defs>
-              <filter id="wave-glow" x="-10%" y="-40%" width="120%" height="180%">
-                <feGaussianBlur in="SourceGraphic" stdDeviation="2.5" result="blur" />
-                <feMerge>
-                  <feMergeNode in="blur" />
-                  <feMergeNode in="SourceGraphic" />
-                </feMerge>
-              </filter>
-            </defs>
-
-            <!-- The pure trading line (no downward shade) -->
-            <path
-              id="wave-path"
-              class="hero__wave-path"
-              fill="none"
-              stroke="#BB232B"
-              stroke-width="3.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              filter="url(#wave-glow)"
-            />
-
-            <!-- Latest-point dot -->
-            <circle id="wave-dot" class="hero__wave-dot" r="5.5" />
-          </svg>
-        </div>
-
       </div><!-- /.hero__panel -->
     </section>
   </main>
