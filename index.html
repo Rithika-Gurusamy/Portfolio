@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>[Your Name] — Portfolio</title>
+
+  <!-- Google Fonts: Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap"
+    rel="stylesheet"
+  />
+
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- ═══════════════════════════════════════════════════
+       PARTICLE CANVAS — fixed behind everything
+  ═══════════════════════════════════════════════════ -->
+  <canvas id="particle-canvas" aria-hidden="true"></canvas>
+
+  <!-- ═══════════════════════════════════════════════════
+       MAIN — hero section
+  ═══════════════════════════════════════════════════ -->
+  <main class="main" role="main">
+    <section class="hero" aria-label="Hero section">
+
+      <!-- The solid blue rectangular box panel -->
+      <div class="hero__panel" role="presentation">
+
+        <!-- Upper two-thirds: headline + sub + CTA -->
+        <div class="hero__content">
+          <!-- PLACEHOLDER: Replace with your headline -->
+          <h1 class="hero__headline">
+            Building things<br />
+            that move markets.
+          </h1>
+
+          <!-- PLACEHOLDER: Replace with your one-line tagline -->
+          <p class="hero__subtitle">
+            [Tagline — e.g. "Full-stack engineer &amp; quant researcher."]
+          </p>
+
+          <!-- PLACEHOLDER: Update href and label for your CTA -->
+          <a href="#work" class="hero__cta" aria-label="See my work">
+            See My Work
+          </a>
+        </div>
+
+        <!-- Lower third: live trading wave (SVG drawn by JS) -->
+        <div class="hero__wave-wrap" aria-hidden="true">
+          <svg
+            id="wave-svg"
+            class="hero__wave-svg"
+            xmlns="http://www.w3.org/2000/svg"
+            preserveAspectRatio="none"
+          >
+            <!-- Gradient fill beneath the line -->
+            <defs>
+              <linearGradient id="wave-fill-grad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%"   stop-color="#BB232B" stop-opacity="0.18" />
+                <stop offset="100%" stop-color="#BB232B" stop-opacity="0" />
+              </linearGradient>
+              <!-- Glow filter -->
+              <filter id="wave-glow" x="-10%" y="-40%" width="120%" height="180%">
+                <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
+
+            <!-- Fill area beneath the trading line -->
+            <path id="wave-fill" class="hero__wave-fill" />
+
+            <!-- The trading line itself -->
+            <path
+              id="wave-path"
+              class="hero__wave-path"
+              fill="none"
+              stroke="#BB232B"
+              stroke-width="3.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              filter="url(#wave-glow)"
+            />
+
+            <!-- Latest-point dot -->
+            <circle id="wave-dot" class="hero__wave-dot" r="5" />
+          </svg>
+        </div>
+
+      </div><!-- /.hero__panel -->
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
+
