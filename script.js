@@ -1,9 +1,9 @@
 /* ═══════════════════════════════════════════════════════════════
    script.js — Portfolio UI Shell
    Sections:
-     1. Constants & 4-color palette configuration
-     2. initParticles() — interactive round glass particles
-     3. initWave()      — clean static trading line (big ridges)
+     1. Constants & 2-color palettes (Espresso & Charcoal)
+     2. initParticles() — interactive hover-activated round glass particles
+     3. initWave()      — clean static trading line (pure stroke, no shade)
      4. init()          — bootstrap
    ═══════════════════════════════════════════════════════════════ */
 
@@ -14,83 +14,63 @@
    ═══════════════════════════════════════════════════════════════ */
 
 const COLOR = {
-  cream: '#FEFFED',
+  cream: '#FAF8F5',
   blue : '#20309A',
   red  : '#BB232B',
 };
 
 /**
- * 4-Color Palettes for Round Glass Particles:
- *   1. Olive / Moss Green
- *   2. Deep Espresso / Dark Chocolate Brown
- *   3. Charcoal / Slate Grey
- *   4. Burnt Ochre / Mustard Yellow
+ * 2-Color Palettes for Round Glass Particles:
+ *   1. Deep Espresso / Dark Chocolate Brown
+ *   2. Charcoal / Slate Grey
+ * (Olive Green & Mustard Yellow removed as requested)
  */
 const PARTICLE_PALETTES = [
-  // 1. Olive / Moss Green
-  {
-    name     : 'olive',
-    highlight: 'rgba(152, 180, 100, 0.55)',
-    mid      : 'rgba(92, 114, 52, 0.72)',
-    deep     : 'rgba(58, 76, 30, 0.88)',
-    rimLight : 'rgba(180, 210, 125, 0.85)',
-    rimDark  : 'rgba(58, 76, 30, 0.50)',
-    shadow   : 'rgba(58, 76, 30, 0.22)',
-  },
-  // 2. Deep Espresso / Dark Chocolate Brown
+  // 1. Deep Espresso / Dark Chocolate Brown
   {
     name     : 'espresso',
-    highlight: 'rgba(115, 75, 54, 0.50)',
-    mid      : 'rgba(58, 34, 22, 0.78)',
-    deep     : 'rgba(36, 19, 11, 0.92)',
-    rimLight : 'rgba(150, 105, 80, 0.75)',
-    rimDark  : 'rgba(36, 19, 11, 0.55)',
-    shadow   : 'rgba(36, 19, 11, 0.25)',
+    highlight: [130, 88, 62],
+    mid      : [58, 34, 22],
+    deep     : [32, 18, 10],
+    rimLight : [160, 115, 88],
+    rimDark  : [32, 18, 10],
+    shadow   : [32, 18, 10],
   },
-  // 3. Charcoal / Slate Grey
+  // 2. Charcoal / Slate Grey
   {
     name     : 'charcoal',
-    highlight: 'rgba(120, 134, 145, 0.50)',
-    mid      : 'rgba(54, 63, 72, 0.74)',
-    deep     : 'rgba(34, 40, 46, 0.90)',
-    rimLight : 'rgba(155, 170, 182, 0.80)',
-    rimDark  : 'rgba(34, 40, 46, 0.52)',
-    shadow   : 'rgba(34, 40, 46, 0.22)',
-  },
-  // 4. Burnt Ochre / Mustard Yellow
-  {
-    name     : 'mustard',
-    highlight: 'rgba(238, 190, 80, 0.58)',
-    mid      : 'rgba(206, 122, 34, 0.76)',
-    deep     : 'rgba(168, 90, 18, 0.90)',
-    rimLight : 'rgba(250, 210, 115, 0.85)',
-    rimDark  : 'rgba(168, 90, 18, 0.52)',
-    shadow   : 'rgba(168, 90, 18, 0.22)',
+    highlight: [130, 142, 155],
+    mid      : [52, 61, 70],
+    deep     : [30, 36, 42],
+    rimLight : [165, 178, 192],
+    rimDark  : [30, 36, 42],
+    shadow   : [30, 36, 42],
   },
 ];
 
 /**
  * Particle visual & physics config.
+ * Hover-activated: blank canvas by default; wakes up dynamically
+ * when the cursor moves across, matching the Google Antigravity hero.
  */
 const PARTICLE_CFG = {
-  minRadius    : 2.8,      // px
-  maxRadius    : 6.2,      // px
-  speed        : 0.45,     // idle drift speed (px/frame at 60fps)
-  waveFreq     : 0.012,    // sine wave frequency for organic drift
-  waveAmp      : 0.6,      // amplitude of sine offset
-  mouseRadius  : 175,      // px — push radius around cursor
-  pushStrength : 6.8,      // force multiplier at centre of push radius
-  damping      : 0.88,     // velocity damping (< 1 = smooth friction)
-  returnK      : 0.045,    // spring constant pulling back to home
-  targetDensity: 1 / 2300, // particles per px² of viewport
-  minCount     : 280,
-  maxCount     : 620,
+  minRadius      : 2.8,   // px
+  maxRadius      : 5.8,   // px
+  influenceRadius: 280,   // px — wake-up / illumination radius around cursor
+  pushRadius     : 180,   // px — physical repulsion radius
+  pushStrength   : 7.5,   // peak repulsion acceleration
+  damping        : 0.85,  // velocity friction
+  returnK        : 0.045, // elastic spring return to home anchor
+  fadeSpeed      : 0.08,  // alpha interpolation speed
+  idleTimeoutMs  : 1600,  // fade back to blank when mouse stops moving
+  targetDensity  : 1 / 1800, // grid density across viewport
+  minCount       : 320,
+  maxCount       : 750,
 };
 
 /**
  * Static trading line normalized points (0.0 to 1.0).
  * Big, bold, clean price ridges with an overall upward trend.
- * Exactly 11 points creating bold peaks and valleys.
  */
 const TRADE_POINTS = [
   { x: 0.00, y: 0.75 }, // starting baseline
@@ -106,16 +86,13 @@ const TRADE_POINTS = [
   { x: 1.00, y: 0.10 }, // latest all-time high point
 ];
 
-/** True if the user prefers reduced motion */
 const REDUCED_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-/** Helpers */
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const rnd   = (min, max) => Math.random() * (max - min) + min;
 
 
 /* ═══════════════════════════════════════════════════════════════
-   2.  ROUND GLASS PARTICLES
+   2.  ROUND GLASS PARTICLES (HOVER-ACTIVATED)
    ═══════════════════════════════════════════════════════════════ */
 
 function initParticles() {
@@ -125,11 +102,18 @@ function initParticles() {
   let   dpr    = window.devicePixelRatio || 1;
 
   let W = 0, H = 0;
-  let mouse = null;
   let particles = [];
 
+  /** Mouse state tracking */
+  let mouse = {
+    x       : -9999,
+    y       : -9999,
+    active  : false,
+    lastMove: 0,
+  };
+
   /**
-   * Creates one round particle with one of the 4 designated colors.
+   * One particle starting at alpha = 0 (blank cream canvas by default).
    */
   function makeParticle(x, y) {
     const palIndex = Math.floor(Math.random() * PARTICLE_PALETTES.length);
@@ -138,11 +122,11 @@ function initParticles() {
       hy      : y,
       x       : x,
       y       : y,
-      vx      : rnd(-0.4, 0.4),
-      vy      : rnd(-0.4, 0.4),
-      phase   : rnd(0, Math.PI * 2),
+      vx      : 0,
+      vy      : 0,
       radius  : rnd(PARTICLE_CFG.minRadius, PARTICLE_CFG.maxRadius),
       palette : PARTICLE_PALETTES[palIndex],
+      alpha   : 0, // starts completely invisible
     };
   }
 
@@ -154,20 +138,16 @@ function initParticles() {
       PARTICLE_CFG.maxCount,
     );
 
-    while (particles.length > count) particles.pop();
-    while (particles.length < count) {
-      particles.push(makeParticle(rnd(0, W), rnd(0, H)));
-    }
+    particles = [];
+    const cols = Math.ceil(Math.sqrt(count * (W / H)));
+    const rows = Math.ceil(count / cols);
 
-    if (particles.length === count) {
-      const cols = Math.ceil(Math.sqrt(count * (W / H)));
-      const rows = Math.ceil(count / cols);
-      particles.forEach((p, i) => {
-        const col = i % cols;
-        const row = Math.floor(i / cols);
-        p.hx = (col + 0.5 + rnd(-0.4, 0.4)) * (W / cols);
-        p.hy = (row + 0.5 + rnd(-0.4, 0.4)) * (H / rows);
-      });
+    for (let i = 0; i < count; i++) {
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      const x   = (col + 0.5 + rnd(-0.4, 0.4)) * (W / cols);
+      const y   = (row + 0.5 + rnd(-0.4, 0.4)) * (H / rows);
+      particles.push(makeParticle(x, y));
     }
   }
 
@@ -185,86 +165,98 @@ function initParticles() {
     buildParticles();
   }
 
-  let frameCount = 0;
-  let rafId      = null;
+  let rafId = null;
 
   function tickParticles() {
     ctx.clearRect(0, 0, W, H);
 
-    frameCount++;
-    const t = frameCount * 0.016;
+    const now = performance.now();
+    // Inactive if mouse stopped moving or went off-screen
+    const isMouseAlive = mouse.active && (now - mouse.lastMove < PARTICLE_CFG.idleTimeoutMs);
 
     for (let i = 0; i < particles.length; i++) {
       const p = particles[i];
-
-      if (REDUCED_MOTION) {
-        drawRoundGlass(ctx, p.hx, p.hy, p.radius, p.palette);
-        continue;
-      }
-
-      // Idle natural drift
-      const driftAngle = p.phase + t * PARTICLE_CFG.speed;
-      const idleVx = Math.cos(driftAngle) * PARTICLE_CFG.waveAmp * PARTICLE_CFG.speed;
-      const idleVy = Math.sin(driftAngle * PARTICLE_CFG.waveFreq * 60) * PARTICLE_CFG.waveAmp * PARTICLE_CFG.speed;
 
       // Spring toward home anchor
       const springVx = (p.hx - p.x) * PARTICLE_CFG.returnK;
       const springVy = (p.hy - p.y) * PARTICLE_CFG.returnK;
 
-      // Mouse / touch repulsion
-      let pushVx = 0, pushVy = 0;
-      if (mouse) {
+      let pushVx = 0;
+      let pushVy = 0;
+      let targetAlpha = 0;
+
+      if (isMouseAlive) {
         const dx = p.x - mouse.x;
         const dy = p.y - mouse.y;
         const d2 = dx * dx + dy * dy;
-        const r  = PARTICLE_CFG.mouseRadius;
-        if (d2 < r * r && d2 > 0.001) {
-          const d      = Math.sqrt(d2);
-          const factor = (1 - d / r);
-          const force  = factor * factor * PARTICLE_CFG.pushStrength;
-          pushVx = (dx / d) * force;
-          pushVy = (dy / d) * force;
+        const infR = PARTICLE_CFG.influenceRadius;
+
+        if (d2 < infR * infR) {
+          const d = Math.sqrt(d2);
+
+          // Alpha reveals around cursor with a smooth radial falloff
+          const normD = d / infR;
+          targetAlpha = Math.pow(1 - normD, 1.4);
+
+          // Outward radial repulsion
+          const pushR = PARTICLE_CFG.pushRadius;
+          if (d < pushR) {
+            const factor = (1 - d / pushR);
+            const force  = factor * factor * PARTICLE_CFG.pushStrength;
+            const safeD  = Math.max(d, 0.001);
+            pushVx = (dx / safeD) * force;
+            pushVy = (dy / safeD) * force;
+          }
         }
       }
 
-      // Physics integration
-      p.vx = (p.vx + idleVx + springVx + pushVx) * PARTICLE_CFG.damping;
-      p.vy = (p.vy + idleVy + springVy + pushVy) * PARTICLE_CFG.damping;
+      // Smoothly interpolate alpha (reveals when hovered, dissolves back to blank)
+      p.alpha += (targetAlpha - p.alpha) * PARTICLE_CFG.fadeSpeed;
+
+      // Integrate velocity and position
+      p.vx = (p.vx + springVx + pushVx) * PARTICLE_CFG.damping;
+      p.vy = (p.vy + springVy + pushVy) * PARTICLE_CFG.damping;
 
       p.x += p.vx;
       p.y += p.vy;
 
-      drawRoundGlass(ctx, p.x, p.y, p.radius, p.palette);
+      // Draw only if visible (keeps canvas blank otherwise)
+      if (p.alpha > 0.01) {
+        drawRoundGlass(ctx, p.x, p.y, p.radius, p.palette, p.alpha);
+      }
     }
 
     rafId = requestAnimationFrame(tickParticles);
   }
 
   /**
-   * Draw a spherical frosted glass disc / bead:
-   * 1. Soft depth shadow casting on #FEFFED.
-   * 2. 3D radial glass gradient with top-left specular highlight.
-   * 3. Polished bevel rim stroke catching directional light.
-   * 4. Crisp specular glint dot in the upper-left facet.
+   * Draw a spherical frosted glass bead with alpha scaling.
    */
-  function drawRoundGlass(ctx, cx, cy, r, pal) {
+  function drawRoundGlass(ctx, cx, cy, r, pal, alpha) {
     ctx.save();
     ctx.translate(cx, cy);
 
-    // 1. Ambient depth shadow
-    ctx.shadowColor   = pal.shadow;
-    ctx.shadowBlur    = 4.5;
+    const a = clamp(alpha, 0, 1);
+
+    // 1. Soft depth shadow
+    const sh = pal.shadow;
+    ctx.shadowColor   = `rgba(${sh[0]}, ${sh[1]}, ${sh[2]}, ${(0.22 * a).toFixed(3)})`;
+    ctx.shadowBlur    = 4.5 * a;
     ctx.shadowOffsetY = 1.3;
 
-    // 2. Circular body path & radial glass refraction
+    // 2. Circular body path & 3D radial glass refraction
     ctx.beginPath();
     ctx.arc(0, 0, r, 0, Math.PI * 2);
 
     const grad = ctx.createRadialGradient(-r * 0.35, -r * 0.35, r * 0.08, 0, 0, r);
-    grad.addColorStop(0,    'rgba(255, 255, 255, 0.92)'); // top-left light catch
-    grad.addColorStop(0.24, pal.highlight);               // translucent glass core
-    grad.addColorStop(0.76, pal.mid);                     // rich jewel tone
-    grad.addColorStop(1,    pal.deep);                    // deeper underbelly
+    const hl = pal.highlight;
+    const md = pal.mid;
+    const dp = pal.deep;
+
+    grad.addColorStop(0,    `rgba(255, 255, 255, ${(0.92 * a).toFixed(3)})`);
+    grad.addColorStop(0.24, `rgba(${hl[0]}, ${hl[1]}, ${hl[2]}, ${(0.55 * a).toFixed(3)})`);
+    grad.addColorStop(0.76, `rgba(${md[0]}, ${md[1]}, ${md[2]}, ${(0.75 * a).toFixed(3)})`);
+    grad.addColorStop(1,    `rgba(${dp[0]}, ${dp[1]}, ${dp[2]}, ${(0.90 * a).toFixed(3)})`);
     ctx.fillStyle = grad;
     ctx.fill();
 
@@ -274,9 +266,11 @@ function initParticles() {
     ctx.lineWidth   = 0.85;
 
     const rimGrad = ctx.createLinearGradient(-r, -r, r, r);
-    rimGrad.addColorStop(0,   'rgba(255, 255, 255, 0.95)');
-    rimGrad.addColorStop(0.4, pal.rimLight);
-    rimGrad.addColorStop(1,   pal.rimDark);
+    const rl = pal.rimLight;
+    const rd = pal.rimDark;
+    rimGrad.addColorStop(0,   `rgba(255, 255, 255, ${(0.95 * a).toFixed(3)})`);
+    rimGrad.addColorStop(0.4, `rgba(${rl[0]}, ${rl[1]}, ${rl[2]}, ${(0.80 * a).toFixed(3)})`);
+    rimGrad.addColorStop(1,   `rgba(${rd[0]}, ${rd[1]}, ${rd[2]}, ${(0.52 * a).toFixed(3)})`);
     ctx.strokeStyle = rimGrad;
     ctx.stroke();
 
@@ -284,24 +278,24 @@ function initParticles() {
     if (r > 3.0) {
       ctx.beginPath();
       ctx.arc(-r * 0.35, -r * 0.35, Math.max(0.6, r * 0.2), 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.88)';
+      ctx.fillStyle = `rgba(255, 255, 255, ${(0.88 * a).toFixed(3)})`;
       ctx.fill();
     }
 
     ctx.restore();
   }
 
-  // Pointer interaction (mouse + touch)
+  // Pointer interaction
   function onPointerMove(e) {
     const rect = canvas.getBoundingClientRect();
-    mouse = {
-      x: (e.clientX ?? e.touches?.[0]?.clientX ?? 0) - rect.left,
-      y: (e.clientY ?? e.touches?.[0]?.clientY ?? 0) - rect.top,
-    };
+    mouse.x = (e.clientX ?? e.touches?.[0]?.clientX ?? 0) - rect.left;
+    mouse.y = (e.clientY ?? e.touches?.[0]?.clientY ?? 0) - rect.top;
+    mouse.active = true;
+    mouse.lastMove = performance.now();
   }
 
   function onPointerLeave() {
-    mouse = null;
+    mouse.active = false;
   }
 
   window.addEventListener('pointermove',  onPointerMove,  { passive: true });
@@ -309,7 +303,7 @@ function initParticles() {
   window.addEventListener('touchmove',    onPointerMove,  { passive: true });
   window.addEventListener('touchend',     onPointerLeave, { passive: true });
 
-  // Pause when tab is not visible
+  // Pause when tab hidden
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
       cancelAnimationFrame(rafId);
@@ -319,7 +313,6 @@ function initParticles() {
     }
   });
 
-  // Responsive resize
   let resizeTimer;
   window.addEventListener('resize', () => {
     clearTimeout(resizeTimer);
@@ -332,21 +325,20 @@ function initParticles() {
 
 
 /* ═══════════════════════════════════════════════════════════════
-   3.  STATIC TRADING WAVE (BIG CLEAN RIDGES)
+   3.  STATIC TRADING LINE (PURE STROKE — NO SHADE/FILL)
    ═══════════════════════════════════════════════════════════════ */
 
 function initWave() {
 
   const svg    = document.getElementById('wave-svg');
   const pathEl = document.getElementById('wave-path');
-  const fillEl = document.getElementById('wave-fill');
   const dotEl  = document.getElementById('wave-dot');
 
-  if (!svg || !pathEl || !fillEl || !dotEl) return;
+  if (!svg || !pathEl || !dotEl) return;
 
   /**
-   * Renders the static trading path and fill based on TRADE_POINTS.
-   * Completely static — NO animation loop, NO ticker scrolling, NO draw-in.
+   * Renders the static trading stroke with big, clear ridges.
+   * Completely static: pure stroke line + endpoint dot with NO fill/shade downward.
    */
   function renderStaticWave() {
     const rect = svg.getBoundingClientRect();
@@ -359,7 +351,7 @@ function initWave() {
       y: pt.y * svgH,
     }));
 
-    // Build the clean jagged stroke path with big ridges
+    // Build the clean jagged stroke path
     coords.forEach((c, i) => {
       pathD += i === 0
         ? `M ${c.x.toFixed(2)},${c.y.toFixed(2)} `
@@ -368,19 +360,13 @@ function initWave() {
 
     pathEl.setAttribute('d', pathD);
 
-    // Build the soft gradient fill beneath the line
-    const first = coords[0];
-    const last  = coords[coords.length - 1];
-    const fillD = `${pathD} L ${last.x.toFixed(2)},${svgH} L ${first.x.toFixed(2)},${svgH} Z`;
-    fillEl.setAttribute('d', fillD);
-
-    // Place the static latest-point dot with radius 5.5
+    // Place the static latest-point dot
+    const last = coords[coords.length - 1];
     dotEl.setAttribute('cx', last.x.toFixed(2));
     dotEl.setAttribute('cy', last.y.toFixed(2));
     dotEl.setAttribute('r',  '5.5');
   }
 
-  // Render on load and update coordinates on resize for perfect responsiveness
   renderStaticWave();
 
   let waveResizeTimer;

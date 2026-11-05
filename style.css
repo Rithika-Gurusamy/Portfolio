@@ -11,7 +11,7 @@
 ─────────────────────────────────────────────── */
 :root {
   /* Core palette */
-  --clr-cream:      #FEFFED;   /* Requested light cream background         */
+  --clr-cream:      #FAF8F5;   /* Restored warm, light cream paper-white   */
   --clr-white:      #FFFFFF;
   --clr-blue:       #20309A;
   --clr-blue-dark:  #182478;   /* slightly deeper blue for hover states    */
@@ -267,13 +267,7 @@ img, svg {
   overflow: visible;
 }
 
-/* Fill beneath the wave */
-.hero__wave-fill {
-  fill: url(#wave-fill-grad);
-  opacity: 1;
-}
-
-/* The trading line — completely static */
+/* The trading line — completely static, pure line without shade */
 .hero__wave-path {
   stroke-dasharray: none;
   stroke-dashoffset: 0;

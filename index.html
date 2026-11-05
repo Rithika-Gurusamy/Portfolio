@@ -58,15 +58,10 @@
             xmlns="http://www.w3.org/2000/svg"
             preserveAspectRatio="none"
           >
-            <!-- Gradient fill beneath the line -->
+            <!-- Glow filter -->
             <defs>
-              <linearGradient id="wave-fill-grad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%"   stop-color="#BB232B" stop-opacity="0.18" />
-                <stop offset="100%" stop-color="#BB232B" stop-opacity="0" />
-              </linearGradient>
-              <!-- Glow filter -->
               <filter id="wave-glow" x="-10%" y="-40%" width="120%" height="180%">
-                <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur" />
+                <feGaussianBlur in="SourceGraphic" stdDeviation="2.5" result="blur" />
                 <feMerge>
                   <feMergeNode in="blur" />
                   <feMergeNode in="SourceGraphic" />
@@ -74,10 +69,7 @@
               </filter>
             </defs>
 
-            <!-- Fill area beneath the trading line -->
-            <path id="wave-fill" class="hero__wave-fill" />
-
-            <!-- The trading line itself -->
+            <!-- The pure trading line (no downward shade) -->
             <path
               id="wave-path"
               class="hero__wave-path"
@@ -90,7 +82,7 @@
             />
 
             <!-- Latest-point dot -->
-            <circle id="wave-dot" class="hero__wave-dot" r="5" />
+            <circle id="wave-dot" class="hero__wave-dot" r="5.5" />
           </svg>
         </div>
 
