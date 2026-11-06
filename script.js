@@ -1,9 +1,10 @@
 /* ═══════════════════════════════════════════════════════════════
    script.js — Portfolio UI Shell
    Sections:
-     1. Constants & Color definitions (#20309A and #BB232B)
-     2. initParticles() — hover-activated, bright solid particles
-                          with discrete Blue <-> Red color flip on hover
+     1. Constants & Colors (#20309A and #BB232B)
+     2. initParticles() — small, delicate particles with soft,
+                          slow, wavy, serene fluid movement.
+                          Stays visible as long as mouse is present.
      3. init()          — bootstrap
    ═══════════════════════════════════════════════════════════════ */
 
@@ -20,28 +21,29 @@ const COLOR = {
 };
 
 /**
- * Particle visual & interaction config.
- * - Flat, solid, fully opaque color — zero glass, zero milky haze.
- * - Tiny teeny elongation (1.35x) oriented along motion.
- * - Discrete flip: Blue becomes Red, Red becomes Blue on hover.
- * - Fully bright (alpha = 1.0) throughout the active cursor zone.
+ * Particle visual & serene wavy fluid config.
+ * - Really small delicate size (1.2px - 2.4px).
+ * - Gentle, slow, wavy, smooth motion (never fast or jerky).
+ * - Stays visible as long as the mouse is hovered (NO timeout).
+ * - Discrete color flip: Blue becomes Red, Red becomes Blue on hover.
  */
 const PARTICLE_CFG = {
   blueRatio      : 0.65,  // 65% Blue, 35% Red natively
-  minRadius      : 3.2,   // px
-  maxRadius      : 6.2,   // px
-  elongation     : 1.35,  // tiny teeny elongation (rx = r * 1.35, ry = r * 0.95)
-  influenceRadius: 280,   // px — wake-up illumination radius around cursor
-  solidRadius    : 220,   // px — full 100% solid opacity zone (maximum brightness)
-  pushRadius     : 180,   // px — physical repulsion & color-inversion radius
-  pushStrength   : 7.8,   // peak repulsion acceleration
-  damping        : 0.86,  // velocity friction
-  returnK        : 0.045, // spring return constant
-  fadeSpeed      : 0.12,  // fast, responsive wake-up
-  idleTimeoutMs  : 1600,  // fade back to blank when mouse stops moving
-  targetDensity  : 1 / 1800,
-  minCount       : 320,
-  maxCount       : 750,
+  minRadius      : 1.2,   // px — delicate small size
+  maxRadius      : 2.3,   // px
+  elongation     : 1.55,  // streamlined elongation
+  influenceRadius: 280,   // px — wake-up / illumination radius around cursor
+  solidRadius    : 210,   // px — 100% full brightness zone
+  pushRadius     : 180,   // px — gentle push & color-inversion radius
+  pushStrength   : 2.2,   // gentle, slow push (never fast)
+  swirlStrength  : 1.4,   // soft tangential wave flow
+  maxSpeed       : 1.6,   // strict speed clamp for smooth, calm motion
+  damping        : 0.93,  // high fluid viscosity (silky gliding)
+  returnK        : 0.018, // very soft, gentle return to home
+  fadeSpeed      : 0.09,  // smooth alpha transition
+  targetDensity  : 1 / 1100, // fine-grained dense particle field
+  minCount       : 500,
+  maxCount       : 1100,
 };
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -49,7 +51,7 @@ const rnd   = (min, max)  => Math.random() * (max - min) + min;
 
 
 /* ═══════════════════════════════════════════════════════════════
-   2.  BRIGHT PARTICLES (HOVER WAKE & DISCRETE COLOR FLIP)
+   2.  SERENE WAVY PARTICLES (HOVER WAKE & DISCRETE COLOR FLIP)
    ═══════════════════════════════════════════════════════════════ */
 
 function initParticles() {
@@ -61,12 +63,13 @@ function initParticles() {
   let W = 0, H = 0;
   let particles = [];
 
-  /** Mouse state tracking */
+  /** Mouse state tracking (stays active as long as pointer is on page) */
   let mouse = {
-    x       : -9999,
-    y       : -9999,
-    active  : false,
-    lastMove: 0,
+    x     : -9999,
+    y     : -9999,
+    vx    : 0,
+    vy    : 0,
+    active: false, // true while pointer is inside the window
   };
 
   /**
@@ -75,16 +78,19 @@ function initParticles() {
   function makeParticle(x, y) {
     const isBlue = Math.random() < PARTICLE_CFG.blueRatio;
     return {
-      hx    : x,
-      hy    : y,
-      x     : x,
-      y     : y,
-      vx    : 0,
-      vy    : 0,
-      angle : rnd(0, Math.PI * 2),
-      radius: rnd(PARTICLE_CFG.minRadius, PARTICLE_CFG.maxRadius),
-      isBlue: isBlue,
-      alpha : 0, // starts invisible
+      hx      : x,
+      hy      : y,
+      x       : x,
+      y       : y,
+      vx      : 0,
+      vy      : 0,
+      angle   : rnd(0, Math.PI * 2),
+      radius  : rnd(PARTICLE_CFG.minRadius, PARTICLE_CFG.maxRadius),
+      isBlue  : isBlue,
+      swirlDir: Math.random() < 0.5 ? 1 : -1,
+      phase   : rnd(0, Math.PI * 2),
+      waveFreq: rnd(0.015, 0.030), // subtle unique wave frequency
+      alpha   : 0,                 // starts invisible
     };
   }
 
@@ -123,18 +129,22 @@ function initParticles() {
     buildParticles();
   }
 
-  let rafId = null;
+  let rafId      = null;
+  let frameCount = 0;
 
   function tickParticles() {
     ctx.clearRect(0, 0, W, H);
+    frameCount++;
+    const time = frameCount * 0.02;
 
-    const now = performance.now();
-    const isMouseAlive = mouse.active && (now - mouse.lastMove < PARTICLE_CFG.idleTimeoutMs);
+    // Smoothly decay mouse inertia
+    mouse.vx *= 0.88;
+    mouse.vy *= 0.88;
 
     for (let i = 0; i < particles.length; i++) {
       const p = particles[i];
 
-      // Spring toward resting home anchor
+      // Very soft, gentle spring pulling back to home position
       const springVx = (p.hx - p.x) * PARTICLE_CFG.returnK;
       const springVy = (p.hy - p.y) * PARTICLE_CFG.returnK;
 
@@ -143,32 +153,51 @@ function initParticles() {
       let targetAlpha = 0;
       let isHovered   = false;
 
-      if (isMouseAlive) {
-        const dx = p.x - mouse.x;
-        const dy = p.y - mouse.y;
-        const d2 = dx * dx + dy * dy;
+      // Stays active as long as the mouse is inside the window (NO arbitrary timeout)
+      if (mouse.active) {
+        const dx   = p.x - mouse.x;
+        const dy   = p.y - mouse.y;
+        const d2   = dx * dx + dy * dy;
         const infR = PARTICLE_CFG.influenceRadius;
 
         if (d2 < infR * infR) {
           const d = Math.sqrt(d2);
 
-          // Full, bright, solid opacity across the active zone (no milky washout)
+          // Solid, bright opacity across active zone
           if (d <= PARTICLE_CFG.solidRadius) {
             targetAlpha = 1.0;
           } else {
-            // Crisp falloff at the outer perimeter
             targetAlpha = (infR - d) / (infR - PARTICLE_CFG.solidRadius);
           }
 
-          // Inversion zone & physical repulsion
+          // Gentle wavy fluid interaction zone
           const pushR = PARTICLE_CFG.pushRadius;
           if (d < pushR) {
-            isHovered = true; // Flips to opposite color
-            const factor = (1 - d / pushR);
-            const force  = factor * factor * PARTICLE_CFG.pushStrength;
+            isHovered = true; // Inverts color: Blue <-> Red
+
+            // Smooth cosine curve for gentle, non-violent repulsion
+            const factor = Math.sin((1 - d / pushR) * Math.PI * 0.5);
             const safeD  = Math.max(d, 0.001);
-            pushVx = (dx / safeD) * force;
-            pushVy = (dy / safeD) * force;
+
+            // 1. Slow, gentle radial expansion
+            const rForce = factor * PARTICLE_CFG.pushStrength;
+            const nx = dx / safeD;
+            const ny = dy / safeD;
+
+            // 2. Soft tangential wave curl
+            const sForce = factor * PARTICLE_CFG.swirlStrength * p.swirlDir;
+            const tx = -ny;
+            const ty = nx;
+
+            // 3. Gentle drag from mouse motion
+            const drag = factor * 0.45;
+
+            // 4. Soft continuous wave undulation while hovering
+            const waveX = Math.sin(p.phase + time + p.hx * 0.015) * 0.4 * factor;
+            const waveY = Math.cos(p.phase + time + p.hy * 0.015) * 0.4 * factor;
+
+            pushVx = nx * rForce + tx * sForce + mouse.vx * drag + waveX;
+            pushVy = ny * rForce + ty * sForce + mouse.vy * drag + waveY;
           }
         }
       }
@@ -176,20 +205,27 @@ function initParticles() {
       // Smooth alpha transition
       p.alpha += (targetAlpha - p.alpha) * PARTICLE_CFG.fadeSpeed;
 
-      // Integrate velocity and position
+      // Apply forces with viscous fluid damping
       p.vx = (p.vx + springVx + pushVx) * PARTICLE_CFG.damping;
       p.vy = (p.vy + springVy + pushVy) * PARTICLE_CFG.damping;
+
+      // Strict speed clamp so particles never move fast
+      const currentSpeed = Math.hypot(p.vx, p.vy);
+      if (currentSpeed > PARTICLE_CFG.maxSpeed) {
+        const scale = PARTICLE_CFG.maxSpeed / currentSpeed;
+        p.vx *= scale;
+        p.vy *= scale;
+      }
 
       p.x += p.vx;
       p.y += p.vy;
 
-      // Update orientation heading along motion
-      const speed = Math.hypot(p.vx, p.vy);
-      if (speed > 0.05) {
+      // Orient elongated streamline along smooth velocity heading
+      if (currentSpeed > 0.03) {
         p.angle = Math.atan2(p.vy, p.vx);
       }
 
-      // Color flip: Blue -> Red, Red -> Blue when hovered near cursor
+      // Discrete color flip: Blue -> Red, Red -> Blue on hover
       let color;
       if (p.isBlue) {
         color = isHovered ? COLOR.red : COLOR.blue;
@@ -207,23 +243,21 @@ function initParticles() {
   }
 
   /**
-   * Draw a flat, solid, bright particle:
-   * - ZERO glass effect, zero cloudy white gradients, zero shadows.
-   * - Crisp solid fill in either #20309A or #BB232B.
-   * - Tiny teeny elongation along motion angle.
+   * Draw a small, crisp, flat particle:
+   * - Tiny size (rx ~ 1.9px - 3.6px, ry ~ 1.1px - 2.1px).
+   * - Pure solid color in either #20309A or #BB232B.
    */
   function drawBrightParticle(ctx, cx, cy, r, angle, color, alpha) {
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate(angle);
 
-    const rx = r * PARTICLE_CFG.elongation; // slightly elongated
-    const ry = r * 0.95;
+    const rx = r * PARTICLE_CFG.elongation;
+    const ry = r * 0.92;
 
     ctx.beginPath();
     ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
 
-    // Solid, vibrant pigment
     ctx.globalAlpha = clamp(alpha, 0, 1);
     ctx.fillStyle   = color;
     ctx.fill();
@@ -234,10 +268,17 @@ function initParticles() {
   // Pointer interaction
   function onPointerMove(e) {
     const rect = canvas.getBoundingClientRect();
-    mouse.x = (e.clientX ?? e.touches?.[0]?.clientX ?? 0) - rect.left;
-    mouse.y = (e.clientY ?? e.touches?.[0]?.clientY ?? 0) - rect.top;
+    const newX = (e.clientX ?? e.touches?.[0]?.clientX ?? 0) - rect.left;
+    const newY = (e.clientY ?? e.touches?.[0]?.clientY ?? 0) - rect.top;
+
+    if (mouse.active) {
+      mouse.vx = (newX - mouse.x) * 0.25;
+      mouse.vy = (newY - mouse.y) * 0.25;
+    }
+
+    mouse.x = newX;
+    mouse.y = newY;
     mouse.active = true;
-    mouse.lastMove = performance.now();
   }
 
   function onPointerLeave() {
