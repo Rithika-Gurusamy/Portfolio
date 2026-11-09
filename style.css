@@ -2,8 +2,9 @@
    style.css — Portfolio UI Shell
    Color palette:
      Page Background : #FFFFFF (Pure White)
-     Blue            : #20309A (Hero box, accents)
-     Red             : #BB232B (Highlights, particle flip)
+     Blue Card       : #20309A (Main Hero Panel)
+     Card Content    : #FFFFFF (White Text, Borders, Badges)
+     Red Accent      : #BB232B (Particle Inversion Highlight)
    ═══════════════════════════════════════════════════════════════ */
 
 /* ───────────────────────────────────────────────
@@ -18,14 +19,19 @@
   --clr-red:        #BB232B;
   --clr-red-dark:   #921a21;
 
+  /* Typography */
+  --font-cinzel:     'Cinzel', Georgia, serif;
+  --font-cormorant:  'Cormorant Garamond', Garamond, Georgia, serif;
+  --font-montserrat: 'Montserrat', system-ui, -apple-system, sans-serif;
+
   /* Hero panel geometry — crisp, solid box */
   --panel-width:    85%;
   --panel-height:   74vh;
-  --panel-min-h:    480px;
+  --panel-min-h:    520px;
 
   /* Animation timing */
   --ease-out-expo:  cubic-bezier(0.16, 1, 0.3, 1);
-  --load-duration:  0.8s;
+  --load-duration:  0.85s;
 }
 
 /* ───────────────────────────────────────────────
@@ -42,7 +48,7 @@ html {
 }
 
 body {
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: var(--font-montserrat);
   background-color: var(--clr-white);
   color: var(--clr-blue);
   min-height: 100vh;
@@ -86,7 +92,6 @@ body {
 /* ───────────────────────────────────────────────
    HERO PANEL
    Crisp, solid architectural blue rectangle box.
-   Empty inside as requested.
 ─────────────────────────────────────────────── */
 .hero__panel {
   position: relative;
@@ -107,8 +112,115 @@ body {
 
   overflow: hidden;
 
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
   /* Entrance animation */
   animation: heroPanel var(--load-duration) var(--ease-out-expo) 0.1s both;
+}
+
+/* ───────────────────────────────────────────────
+   CARD CONTENT (Inside the Blue Box)
+   All typography in pure white (#FFFFFF)
+─────────────────────────────────────────────── */
+.hero__card-content {
+  width: 100%;
+  max-width: 960px;
+  padding: clamp(2rem, 5vh, 4rem) clamp(2rem, 5vw, 4.5rem);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  color: var(--clr-white);
+
+  animation: fadeSlideUp var(--load-duration) var(--ease-out-expo) 0.25s both;
+}
+
+/* Eyebrow / Tagline (Montserrat) */
+.hero__eyebrow {
+  font-family: var(--font-montserrat);
+  font-size: clamp(0.72rem, 1.1vw, 0.85rem);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: rgba(255, 255, 255, 0.72);
+  margin-bottom: clamp(0.5rem, 1.2vh, 0.9rem);
+}
+
+/* Name (Cinzel) */
+.hero__name {
+  font-family: var(--font-cinzel);
+  font-size: clamp(2.8rem, 6.8vw, 5.6rem);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--clr-white);
+  line-height: 1.0;
+  margin-bottom: clamp(1rem, 2.2vh, 1.6rem);
+}
+
+/* Value statement / Headline (Cormorant Garamond) */
+.hero__lead {
+  font-family: var(--font-cormorant);
+  font-size: clamp(1.4rem, 2.6vw, 2.25rem);
+  font-weight: 500;
+  font-style: italic;
+  color: var(--clr-white);
+  line-height: 1.28;
+  letter-spacing: -0.01em;
+  margin-bottom: clamp(0.9rem, 1.8vh, 1.3rem);
+  max-width: 840px;
+}
+
+/* Narrative / Bio line (Cormorant Garamond) */
+.hero__bio {
+  font-family: var(--font-cormorant);
+  font-size: clamp(1.05rem, 1.6vw, 1.26rem);
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.82);
+  line-height: 1.58;
+  max-width: 780px;
+  margin-bottom: clamp(1.5rem, 3vh, 2.4rem);
+}
+
+/* Skill pills container (Montserrat) */
+.hero__skills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem 0.75rem;
+}
+
+/* Individual skill badge */
+.hero__skill-tag {
+  font-family: var(--font-montserrat);
+  font-size: clamp(0.72rem, 1.05vw, 0.82rem);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--clr-white);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  padding: 0.45rem 1.05rem;
+  border-radius: 0; /* clean architectural box lines */
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  transition:
+    background 0.22s ease,
+    border-color 0.22s ease,
+    transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+  cursor: default;
+}
+
+.hero__skill-tag:hover {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.65);
+  transform: translateY(-2px);
+}
+
+/* ───────────────────────────────────────────────
+   KEYFRAME ANIMATIONS
+─────────────────────────────────────────────── */
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0);    }
 }
 
 @keyframes heroPanel {
@@ -122,14 +234,39 @@ body {
 @media (max-width: 900px) {
   :root {
     --panel-width:  92%;
-    --panel-height: 76vh;
+    --panel-height: 78vh;
+    --panel-min-h:  520px;
   }
 }
 
 @media (max-width: 600px) {
   :root {
     --panel-width:  94%;
-    --panel-height: 84vh;
-    --panel-min-h:  420px;
+    --panel-height: auto;
+    --panel-min-h:  460px;
+  }
+
+  .hero__panel {
+    height: auto;
+    min-height: 480px;
+    padding: 1.5rem 0;
+  }
+
+  .hero__card-content {
+    padding: 1.5rem;
+  }
+
+  .hero__name {
+    font-size: clamp(2.4rem, 11vw, 3.4rem);
+  }
+
+  .hero__lead {
+    font-size: 1.25rem;
+    line-height: 1.35;
+  }
+
+  .hero__bio {
+    font-size: 1rem;
+    line-height: 1.5;
   }
 }
